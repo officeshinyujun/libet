@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+build/
+.env
+.env.local
+.DS_Store
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.lgtm/
+.eslintcache
+.vscode/
+
+# TypeScript
+*.tsbuildinfo
+
+# IDEs and OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
