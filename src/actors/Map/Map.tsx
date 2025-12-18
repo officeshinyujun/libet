@@ -2,20 +2,16 @@ import * as React from "react"
 import * as THREE from "three"
 import { RigidBody } from "@react-three/rapier"
 import { MapType } from "./type"
-
-type Tile = {
-  key: string
-  position: [number, number, number]
-}
+import { useMapDivider } from "./useMapDivider"
 
 export default function Map(props: MapType) {
   const {
     name,
-    scale = [1, 1, 1],
-    position = [0, 0, 0],
-    rotation = [0, 0, 0],
+    scale ,
+    position ,
+    rotation ,
     modelpath,
-    physics = "none",
+    physics,
     chuckSize,
     isChunked,
   } = props
@@ -26,42 +22,16 @@ export default function Map(props: MapType) {
     return modelpath.clone(true)
   }, [modelpath])
 
-  /** chunk 계산 */
-  const tiles = React.useMemo<Tile[]>(() => {
+  /** chunk 분할 (useMapDivider 사용) */
+  const tiles = React.useMemo(() => {
     if (!object || !isChunked || !chuckSize) return []
-
-    const box = new THREE.Box3().setFromObject(object)
-    const size = new THREE.Vector3()
-    box.getSize(size)
-
-    const width = size.x
-    const depth = size.z
-
-    const tilesX = Math.ceil(width / chuckSize)
-    const tilesZ = Math.ceil(depth / chuckSize)
-
-    const startX = -width / 2
-    const startZ = -depth / 2
-
-    const result: Tile[] = []
-
-    for (let x = 0; x < tilesX; x++) {
-      for (let z = 0; z < tilesZ; z++) {
-        result.push({
-          key: `${x}-${z}`,
-          position: [
-            startX + (x + 0.5) * chuckSize,
-            0,
-            startZ + (z + 0.5) * chuckSize,
-          ],
-        })
-      }
-    }
-
-    return result
+    return useMapDivider({
+      object,
+      chunkSize: chuckSize,
+    })
   }, [object, isChunked, chuckSize])
 
-  /** ====== Chunked Map ====== */
+  /** ===== Chunked Map ===== */
   if (isChunked && object && chuckSize) {
     return (
       <group
@@ -71,11 +41,16 @@ export default function Map(props: MapType) {
         rotation={rotation}
       >
         {tiles.map((tile) => {
-          const content = <primitive object={object.clone(true)} />
+          const content = (
+            <primitive object={object.clone(true)} />
+          )
 
           if (physics === "none") {
             return (
-              <group key={tile.key} position={tile.position}>
+              <group
+                key={tile.index.join("-")}
+                position={tile.position}
+              >
                 {content}
               </group>
             )
@@ -83,7 +58,7 @@ export default function Map(props: MapType) {
 
           return (
             <RigidBody
-              key={tile.key}
+              key={tile.index.join("-")}
               type="fixed"
               colliders="trimesh"
             >
@@ -97,8 +72,12 @@ export default function Map(props: MapType) {
     )
   }
 
-  /** ====== Non-Chunked Map ====== */
-  const content = object ? <primitive object={object} /> : <mesh />
+  /** ===== Non-Chunked Map ===== */
+  const content = object ? (
+    <primitive object={object} />
+  ) : (
+    <mesh />
+  )
 
   if (physics === "none") {
     return (
