@@ -1,5 +1,5 @@
 export type BaseActorType = {
-    id : string;
+    name : string;
     tags : string[];
     scale : [number,number,number];
     rotation : [number,number,number];

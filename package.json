@@ -22,6 +22,7 @@
     "typescript": "^5.0.0"
   },
   "dependencies": {
+    "@react-three/rapier": "^2.2.0",
     "react-three-fiber": "^6.0.13"
   }
 }
