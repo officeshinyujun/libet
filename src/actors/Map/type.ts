@@ -5,4 +5,6 @@ export type MapType = BaseActorType & {
     modelpath : THREE.Group | THREE.Mesh | THREE.Object3D;
     userView ?: string;
     physics?: "fixed" | "none";
+    chuckSize ?: number;
+    isChunked ?: boolean;
 }
