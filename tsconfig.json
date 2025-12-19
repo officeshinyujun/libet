@@ -9,8 +9,9 @@
     "declaration": true,
     "outDir": "dist",
     "skipLibCheck": true,
+    "composite": true,
     "jsxImportSource": "react",
     "types": ["@react-three/fiber"]
   },
-  "include": ["src"]
+  "include": ["src/**/*"]
 }

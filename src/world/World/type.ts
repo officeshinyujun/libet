@@ -17,6 +17,9 @@ export type WorldType = {
    */
   children: React.ReactNode
 
+  width : string;
+  height : string;
+
   /**
    * 물리 엔진 전역 설정
    */

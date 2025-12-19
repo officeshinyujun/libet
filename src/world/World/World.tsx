@@ -10,9 +10,11 @@ export function World({
   debug,
   onReady,
   onTick,
+  width,
+  height
 }: WorldType) {
   return (
-    <Canvas camera={camera}>
+    <Canvas camera={camera} style={{ width, height }}>
       <Physics
         gravity={physics?.gravity ?? [0, -9.81, 0]}
         paused={physics?.paused}
