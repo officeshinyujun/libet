@@ -1,8 +1,10 @@
 import {CharacterType} from "./type"
+import { RigidBody } from "@react-three/rapier"
 
 export default function Character(props : CharacterType) {
     const {name, tags, scale, rotation, position, modelpath, controllerID, speed, jumpHeight} = props
     return (
+      <RigidBody>
         <group>
             {modelpath ? 
             (<primitive 
@@ -24,5 +26,6 @@ export default function Character(props : CharacterType) {
                 </mesh>
             )}
         </group>
+      </RigidBody>
     )
 }
