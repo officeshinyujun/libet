@@ -2,6 +2,7 @@ import { Canvas } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
 import { WorldType } from "./type";
 import { Suspense } from "react";
+import { WorldProvider } from "./WorldContext";
 
 export function World({
   children,
@@ -21,9 +22,11 @@ export function World({
         paused={physics?.paused}
         debug={debug?.physics}
       >
-        <Suspense fallback={null}>
-          {children}
-        </Suspense>
+        <WorldProvider>
+            <Suspense fallback={null}>
+            {children}
+            </Suspense>
+        </WorldProvider>
       </Physics>
     </Canvas>
   )

@@ -14,9 +14,6 @@ export type CharacterType = BaseActorType & {
    */
   modelpath?: THREE.Group | THREE.Mesh | THREE.Object3D
 
-  /** 사용할 컨트롤러 ID (ex: "player", "ai", "network") */
-  controllerID: string
-
   /** 이동 속도 (world unit / second) */
   speed: number
 
