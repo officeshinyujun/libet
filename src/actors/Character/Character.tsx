@@ -18,7 +18,7 @@ export default function Character(props : CharacterType) {
     }, [name, registerCharacter, unregisterCharacter, props])
 
     return (
-      <RigidBody ref={rigidBodyRef} position={position} rotation={rotation} lockRotations>
+      <RigidBody ref={rigidBodyRef} position={position} rotation={rotation} lockRotations ccd>
         <group>
             {modelpath ? 
             (<primitive 

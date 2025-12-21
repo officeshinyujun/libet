@@ -3,6 +3,7 @@ import { useWorld } from "../../world/World/WorldContext"
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useState, useMemo } from "react"
 import { PointerLockControls } from "@react-three/drei"
+import { useRapier } from "@react-three/rapier"
 import * as THREE from "three"
 
 /**
@@ -11,12 +12,13 @@ import * as THREE from "three"
  * Handles First-Person control logic.
  * - Syncs Camera position to Character (eye level).
  * - Uses PointerLockControls for Camera rotation.
- * - Calculates movement relative to Camera view direction.
+ * - Uses Raycasting for Ground Detection (Jump).
  */
 export default function PlayerController(props : PlayerControllerType) {
     const {controllerID, view} = props
     const { getCharacter } = useWorld()
     const { camera } = useThree()
+    const { rapier, world } = useRapier()
     
     // Input state
     const [moveForward, setMoveForward] = useState(false)
@@ -30,6 +32,10 @@ export default function PlayerController(props : PlayerControllerType) {
     const sideVector = useMemo(() => new THREE.Vector3(), [])
     const direction = useMemo(() => new THREE.Vector3(), [])
     const worldUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
+    
+    // Raycast setup
+    // Determine if we need to filter interaction groups or just hit everything (solid)
+    // For now, hitting anything solid is fine.
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
@@ -74,42 +80,23 @@ export default function PlayerController(props : PlayerControllerType) {
         const charProps = characterData.props;
         
         const position = rigidBody.translation();
-        
-        // --- 1. Camera Sync (Eye Level Calculation) ---
-        // Calculate eye height based on character scale (collider height).
-        // Assuming box/capsule is centered, height is scale.y.
-        // Eye level is usually near the top (e.g., 90% of half-height from center).
-        if (view === 'firstPerson') {
-             const scale = charProps.scale || [1, 1, 1];
-             const height = scale[1]; 
-             // Position is center. Top is +height/2. Eye level slightly below top.
-             const eyeOffset = height / 2 * 0.9; 
+        const scale = charProps.scale || [1, 1, 1];
+        const height = scale[1]; 
 
-             // Directly copy position to avoid jitter from interpolation lag 
-             // relative to the physics update, assuming this runs after physics.
+        // --- 1. Camera Sync (Eye Level Calculation) ---
+        if (view === 'firstPerson') {
+             const eyeOffset = height / 2 * 0.9; 
              camera.position.set(position.x, position.y + eyeOffset, position.z);
         }
 
         // --- 2. Movement Logic (Camera Relative) ---
-        // Get camera forward direction
         camera.getWorldDirection(frontVector);
-        
-        // Flatten to horizontal plane (XZ) to prevent flying/digging
         frontVector.y = 0;
         frontVector.normalize();
 
-        // Calculate Right vector (Cross product of Up and Forward)
         sideVector.crossVectors(frontVector, worldUp).normalize();
         
-        // Reset direction
         direction.set(0, 0, 0);
-
-        // Apply Inputs: 
-        // Forward/Back moves along frontVector
-        // Left/Right moves along sideVector
-        // Note: 'sideVector' from cross(front, up) points Left (in Three.js RHR? No, Right usually). 
-        // Let's verify: Cross(Forward, Up). If Forward is -Z, Up is +Y -> Cross is -X (Right).
-        // So +1 on sideVector should be Right.
         
         const fwd = Number(moveForward) - Number(moveBackward);
         const right = Number(moveRight) - Number(moveLeft);
@@ -121,20 +108,79 @@ export default function PlayerController(props : PlayerControllerType) {
         const speed = charProps.speed || 5.0;
         const vel = rigidBody.linvel();
         
-        // Apply velocity
-        // Keep vertical velocity (gravity) untouched unless jumping
         rigidBody.setLinvel({ 
             x: direction.x * speed, 
             y: vel.y, 
             z: direction.z * speed 
         }, true);
 
-        // --- 3. Jump Logic ---
+        // --- 3. Jump Logic (Raycast Ground Check) ---
         if (jump) {
-             // Simple ground check approximation (vertical velocity ~ 0)
-             if (Math.abs(vel.y) < 0.1) {
-                 const jumpHeight = charProps.jumpHeight || 5.0;
-                 rigidBody.applyImpulse({ x: 0, y: jumpHeight, z: 0 }, true);
+             // Origin: Center of body
+             // Direction: Down
+             const rayOrigin = position;
+             const rayDir = { x: 0, y: -1, z: 0 };
+             // Length: Half height + margin. 
+             // Margin needs to be small but enough to catch the floor contact.
+             const rayLength = (height / 2) + 0.1; 
+             
+             // Create Ray
+             const ray = new rapier.Ray(rayOrigin, rayDir);
+             
+             // Cast ray
+             // hit will be null if nothing found within maxToi
+             const hit = world.castRay(ray, rayLength, true);
+
+             // Check if hit exists and isn't the player itself?
+             // Rapier rays usually don't hit the source collider if it starts inside, 
+             // but 'solid' param (3rd arg) might affect this.
+             // Usually we filter out the player collider, but simplest is relying on 'internal' checks.
+             // If we start at center, we are inside our own collider. 
+             // If 'solid' is true, it might hit ourselves at distance 0.
+             // So we should filter specific collider or ignore self.
+             
+             // A better approach without filtering complexity: start ray slightly below center?
+             // Or check hit distance. If distance < epsilon, it's self.
+             
+             // However, cleaner way: RigidBody excludes itself from queries? Not automatic.
+             
+             // Let's assume for now the ray starts inside and ignores backfaces/internal or we can use a InteractionGroup.
+             // BUT, easiest fix: Use 'world.castRay' with a filter or simple distance check?
+             // Actually, if we hit ourselves, the distance is 0. Ground is at height/2.
+             
+             // Let's refine: Start ray at bottom + epsilon UP? No, prone to tunnelling.
+             
+             // Filter:
+             // castRay(ray, maxToi, solid, filterFlags, filterGroups, filterExcludeCollider, filterExcludeRigidBody)
+             // We can pass 'rigidBody' to exclude it!
+             
+             const hitFiltered = world.castRay(
+                ray, 
+                rayLength, 
+                true, 
+                undefined, 
+                undefined, 
+                undefined, 
+                rigidBody // Exclude this rigid body
+             );
+
+             if (hitFiltered) {
+                 // Grounded!
+                 // Check if vertical velocity is negligible (standing on ground)
+                 if (Math.abs(vel.y) < 0.5) { 
+                     const targetHeight = charProps.jumpHeight || 1.0;
+                     const gravity = 9.81; // Standard earth gravity approximation
+                     const mass = rigidBody.mass();
+                     
+                     // v^2 = u^2 + 2as -> v = sqrt(2 * g * h)
+                     const jumpVelocity = Math.sqrt(2 * gravity * targetHeight);
+                     
+                     // Impulse = Change in Momentum = m * delta_v
+                     // We want to reach jumpVelocity instantly from 0 vertical velocity.
+                     const impulseY = mass * jumpVelocity;
+
+                     rigidBody.applyImpulse({ x: 0, y: impulseY, z: 0 }, true);
+                 }
              }
         }
     });
