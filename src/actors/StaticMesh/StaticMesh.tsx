@@ -11,7 +11,8 @@ export default function StaticMesh(props: StaticMeshType) {
         modelpath, 
         physics = "fixed",
         collider,
-        color = "white"
+        color = "white",
+        children
     } = props
 
     const content = useMemo(() => {
@@ -19,16 +20,19 @@ export default function StaticMesh(props: StaticMeshType) {
             return (
                 <primitive 
                     object={modelpath} 
-                />
+                >
+                    {children}
+                </primitive>
             )
         }
         return (
             <mesh>
                 <boxGeometry />
                 <meshStandardMaterial color={color} />
+                {children}
             </mesh>
         )
-    }, [modelpath, color])
+    }, [modelpath, color, children])
 
     if (physics === 'none') {
         return (

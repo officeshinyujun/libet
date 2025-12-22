@@ -3,6 +3,7 @@ import { Physics } from "@react-three/rapier";
 import { WorldType } from "./type";
 import { Suspense } from "react";
 import { WorldProvider } from "./WorldContext";
+import { InteractionProvider, InteractionManager } from "../../objects/Effects/InteractionComponent";
 
 export function World({
   children,
@@ -23,9 +24,12 @@ export function World({
         debug={debug?.physics}
       >
         <WorldProvider>
-            <Suspense fallback={null}>
-            {children}
-            </Suspense>
+            <InteractionProvider>
+                <InteractionManager />
+                <Suspense fallback={null}>
+                {children}
+                </Suspense>
+            </InteractionProvider>
         </WorldProvider>
       </Physics>
     </Canvas>

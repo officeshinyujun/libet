@@ -22,4 +22,7 @@ export type StaticMeshType = BaseActorType & {
 
     /** Color for the default mesh (if modelpath is missing) */
     color?: string;
+
+    /** Optional children to be rendered inside the mesh */
+    children?: React.ReactNode;
 }

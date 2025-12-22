@@ -46,16 +46,19 @@ export default function Pawn(props: PawnType) {
                 <primitive 
                     object={modelpath} 
                     scale={scale} 
-                />
+                >
+                    {children}
+                </primitive>
             )
         }
         return (
             <mesh scale={scale}>
                 <boxGeometry />
                 <meshStandardMaterial color={color} />
+                {children}
             </mesh>
         )
-    }, [modelpath, scale, color]);
+    }, [modelpath, scale, color, children]);
 
     // Default collider: 'hull' for models (dynamic friendly), 'cuboid' for box
     const defaultCollider = modelpath ? "hull" : "cuboid";
@@ -73,7 +76,6 @@ export default function Pawn(props: PawnType) {
         >
             <PawnContext.Provider value={contextValue}>
                 {content}
-                {children}
             </PawnContext.Provider>
         </RigidBody>
     );
