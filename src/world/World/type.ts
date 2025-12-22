@@ -1,4 +1,5 @@
 import * as React from "react"
+import { CanvasProps } from "@react-three/fiber"
 
 /**
  * World 컴포넌트 Props
@@ -8,7 +9,7 @@ import * as React from "react"
  *
  * 모든 Map, Character, Entity는 children으로 포함되어야 한다.
  */
-export type WorldType = {
+export type WorldType = Omit<CanvasProps, 'children' | 'camera'> & {
   /**
    * 월드 내부에 배치될 엔티티들
    *
@@ -17,8 +18,8 @@ export type WorldType = {
    */
   children: React.ReactNode
 
-  width : string;
-  height : string;
+  width?: string;
+  height?: string;
 
   /**
    * 물리 엔진 전역 설정
