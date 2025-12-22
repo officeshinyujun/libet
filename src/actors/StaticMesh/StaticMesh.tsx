@@ -40,10 +40,13 @@ export default function StaticMesh(props: StaticMeshType) {
     }
 
     // Default collider logic: 
-    // If model provided -> 'trimesh' (accurate for static) or 'hull' (for dynamic simple)
-    // If box -> 'cuboid'
-    // Unless overridden by 'collider' prop.
-    const defaultCollider = modelpath ? "trimesh" : "cuboid";
+    // If model provided:
+    //   - 'dynamic' physics -> 'hull' (convex hull) is safer and more stable than trimesh for moving objects.
+    //   - 'fixed' physics -> 'trimesh' is fine for static scenery.
+    // If no model (box) -> 'cuboid'
+    const defaultCollider = modelpath 
+        ? (physics === 'dynamic' ? 'hull' : 'trimesh')
+        : "cuboid";
     const appliedCollider = collider ?? defaultCollider;
 
     return (
