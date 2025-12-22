@@ -3,7 +3,7 @@ import { useWorld } from "../../world/World/WorldContext"
 import { useFrame, useThree } from "@react-three/fiber"
 import { useEffect, useState, useMemo } from "react"
 import { PointerLockControls } from "@react-three/drei"
-import { useRapier } from "@react-three/rapier"
+import { useRapier, useBeforePhysicsStep } from "@react-three/rapier"
 import * as THREE from "three"
 import { applyDirectMovement } from "../../systems/MovementSystem/DirectMovement"
 import { applyInertialMovement } from "../../systems/MovementSystem/InertialMovement"
@@ -31,13 +31,13 @@ export default function PlayerController(props : PlayerControllerType) {
     const { camera } = useThree()
     const { rapier, world } = useRapier()
     
-    // Input state
-    const [moveForward, setMoveForward] = useState(false)
-    const [moveBackward, setMoveBackward] = useState(false)
-    const [moveLeft, setMoveLeft] = useState(false)
-    const [moveRight, setMoveRight] = useState(false)
-    const [jump, setJump] = useState(false)
-    const [isCrouching, setIsCrouching] = useState(false)
+    // Input state refs
+    const moveForward = useRef(false)
+    const moveBackward = useRef(false)
+    const moveLeft = useRef(false)
+    const moveRight = useRef(false)
+    const jump = useRef(false)
+    const isCrouching = useRef(false)
 
     // Reusable vectors to avoid GC overhead
     const frontVector = useMemo(() => new THREE.Vector3(), [])
@@ -51,34 +51,34 @@ export default function PlayerController(props : PlayerControllerType) {
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.code === crouchKey && crouch) {
-                setIsCrouching(true);
+                isCrouching.current = true;
             }
             switch (event.code) {
                 case 'ArrowUp':
-                case 'KeyW': setMoveForward(true); break;
+                case 'KeyW': moveForward.current = true; break;
                 case 'ArrowLeft':
-                case 'KeyA': setMoveLeft(true); break;
+                case 'KeyA': moveLeft.current = true; break;
                 case 'ArrowDown':
-                case 'KeyS': setMoveBackward(true); break;
+                case 'KeyS': moveBackward.current = true; break;
                 case 'ArrowRight':
-                case 'KeyD': setMoveRight(true); break;
-                case 'Space': setJump(true); break;
+                case 'KeyD': moveRight.current = true; break;
+                case 'Space': jump.current = true; break;
             }
         };
         const onKeyUp = (event: KeyboardEvent) => {
             if (event.code === crouchKey && crouch) {
-                setIsCrouching(false);
+                isCrouching.current = false;
             }
             switch (event.code) {
                 case 'ArrowUp':
-                case 'KeyW': setMoveForward(false); break;
+                case 'KeyW': moveForward.current = false; break;
                 case 'ArrowLeft':
-                case 'KeyA': setMoveLeft(false); break;
+                case 'KeyA': moveLeft.current = false; break;
                 case 'ArrowDown':
-                case 'KeyS': setMoveBackward(false); break;
+                case 'KeyS': moveBackward.current = false; break;
                 case 'ArrowRight':
-                case 'KeyD': setMoveRight(false); break;
-                case 'Space': setJump(false); break;
+                case 'KeyD': moveRight.current = false; break;
+                case 'Space': jump.current = false; break;
             }
         };
         document.addEventListener('keydown', onKeyDown);
@@ -89,48 +89,18 @@ export default function PlayerController(props : PlayerControllerType) {
         };
     }, [crouch, crouchKey]);
 
-    useFrame((state, delta) => {
+    // --- Physics Update Loop (Fixed Step) ---
+    useBeforePhysicsStep((world) => {
         const characterData = getCharacter(controllerID);
         if (!characterData || !characterData.ref.current) return;
 
         const rigidBody = characterData.ref.current;
         const charProps = characterData.props;
-        
-        const position = rigidBody.translation();
-        const scale = charProps.scale || [1, 1, 1];
-        const height = scale[1]; 
+        const speed = charProps.speed || 5.0;
+        const height = (charProps.scale?.[1] || 1);
 
-        // --- Crouch Logic ---
-        const standingEyeHeight = height / 2 * 0.9;
-        const crouchingEyeHeight = standingEyeHeight * crouchDepth;
-        const targetEyeHeight = isCrouching ? crouchingEyeHeight : standingEyeHeight;
-
-        // Initialize currentHeightOffset if it's the first frame (0)
-        if (currentHeightOffset.current === 0) currentHeightOffset.current = standingEyeHeight;
-
-        // Smoothly interpolate camera height
-        currentHeightOffset.current = THREE.MathUtils.lerp(currentHeightOffset.current, targetEyeHeight, 10 * delta);
-
-        // --- 1. Camera Sync (Eye Level Calculation) ---
-        if (view === 'firstPerson') {
-             camera.position.set(position.x, position.y + currentHeightOffset.current, position.z);
-        } else if (view === 'thirdPerson') {
-             // Third Person: Orbit around the character
-             // Focus point changes with crouch
-             const focusY = currentHeightOffset.current * 0.8; // Look slightly below eye level
-             const focusPoint = new THREE.Vector3(position.x, position.y + focusY, position.z);
-             
-             // Offset distance based on scale
-             const distance = height * 3.0; // Distance behind
-             
-             // Calculate offset vector relative to camera rotation
-             const offset = new THREE.Vector3(0, 0, distance);
-             offset.applyQuaternion(camera.quaternion);
-             
-             camera.position.copy(focusPoint).add(offset);
-        }
-
-        // --- 2. Movement Logic (Camera Relative) ---
+        // --- 1. Movement Logic ---
+        // Calculate direction based on camera and input
         camera.getWorldDirection(frontVector);
         frontVector.y = 0;
         frontVector.normalize();
@@ -144,38 +114,31 @@ export default function PlayerController(props : PlayerControllerType) {
         
         direction.set(0, 0, 0);
         
-        const fwd = Number(moveForward) - Number(moveBackward);
-        const right = Number(moveRight) - Number(moveLeft);
+        const fwd = Number(moveForward.current) - Number(moveBackward.current);
+        const right = Number(moveRight.current) - Number(moveLeft.current);
 
         direction.addScaledVector(frontVector, fwd);
         direction.addScaledVector(sideVector, right);
         direction.normalize();
         
-        const speed = charProps.speed || 5.0;
-        const vel = rigidBody.linvel();
-        
+        // Use fixed delta for physics calculations
+        const fixedDelta = 1 / 60; 
+
         if (inertia) {
-            applyInertialMovement(rigidBody, direction, speed, delta);
+            applyInertialMovement(rigidBody, direction, speed, fixedDelta);
         } else {
             applyDirectMovement(rigidBody, direction, speed);
         }
 
-        // --- 3. Jump Logic (Raycast Ground Check) ---
-        if (jump) {
-             // Origin: Center of body
-             // Direction: Down
+        // --- 2. Jump Logic ---
+        if (jump.current) {
+             const position = rigidBody.translation();
+             const vel = rigidBody.linvel();
              const rayOrigin = position;
              const rayDir = { x: 0, y: -1, z: 0 };
-             // Length: Half height + margin. 
-             // Margin needs to be small but enough to catch the floor contact.
              const rayLength = (height / 2) + 0.1; 
              
-             // Create Ray
              const ray = new rapier.Ray(rayOrigin, rayDir);
-             
-             // Cast ray
-             // hit will be null if nothing found within maxToi
-             const hit = world.castRay(ray, rayLength, true);
              
              const hitFiltered = world.castRay(
                 ray, 
@@ -184,27 +147,60 @@ export default function PlayerController(props : PlayerControllerType) {
                 undefined, 
                 undefined, 
                 undefined, 
-                rigidBody // Exclude this rigid body
+                rigidBody
              );
 
              if (hitFiltered) {
-                 // Grounded!
-                 // Check if vertical velocity is negligible (standing on ground)
                  if (Math.abs(vel.y) < 0.5) { 
                      const targetHeight = charProps.jumpHeight || 1.0;
-                     const gravity = 9.81; // Standard earth gravity approximation
+                     const gravity = 9.81;
                      const mass = rigidBody.mass();
-                     
-                     // v^2 = u^2 + 2as -> v = sqrt(2 * g * h)
                      const jumpVelocity = Math.sqrt(2 * gravity * targetHeight);
-                     
-                     // Impulse = Change in Momentum = m * delta_v
-                     // We want to reach jumpVelocity instantly from 0 vertical velocity.
                      const impulseY = mass * jumpVelocity;
 
                      rigidBody.applyImpulse({ x: 0, y: impulseY, z: 0 }, true);
                  }
              }
+        }
+    });
+
+    // --- Render Update Loop (Frame Rate) ---
+    useFrame((state, delta) => {
+        const characterData = getCharacter(controllerID);
+        if (!characterData || !characterData.ref.current) return;
+
+        const rigidBody = characterData.ref.current;
+        const charProps = characterData.props;
+        
+        // Use lerp for smooth visual updates of the camera
+        // Note: We read the RB position here. If RB is updated in fixed step,
+        // this might still be "stepped" unless we interpolate.
+        // But the camera lerp below helps smooth out the steps.
+        const position = rigidBody.translation();
+        const height = (charProps.scale?.[1] || 1); 
+
+        // --- Crouch Logic (Visual) ---
+        const standingEyeHeight = height / 2 * 0.9;
+        const crouchingEyeHeight = standingEyeHeight * crouchDepth;
+        const targetEyeHeight = isCrouching.current ? crouchingEyeHeight : standingEyeHeight;
+
+        if (currentHeightOffset.current === 0) currentHeightOffset.current = standingEyeHeight;
+        currentHeightOffset.current = THREE.MathUtils.lerp(currentHeightOffset.current, targetEyeHeight, 10 * delta);
+
+        // --- Camera Sync ---
+        const targetCameraPos = new THREE.Vector3(position.x, position.y + currentHeightOffset.current, position.z);
+
+        if (view === 'firstPerson') {
+             camera.position.lerp(targetCameraPos, 0.5);
+        } else if (view === 'thirdPerson') {
+             const focusY = currentHeightOffset.current * 0.8;
+             const focusPoint = new THREE.Vector3(position.x, position.y + focusY, position.z);
+             const distance = height * 3.0;
+             const offset = new THREE.Vector3(0, 0, distance);
+             offset.applyQuaternion(camera.quaternion);
+             
+             const targetThirdPersonPos = focusPoint.clone().add(offset);
+             camera.position.lerp(targetThirdPersonPos, 0.5);
         }
     });
 
