@@ -19,21 +19,20 @@ export default function StaticMesh(props: StaticMeshType) {
             return (
                 <primitive 
                     object={modelpath} 
-                    scale={scale} 
                 />
             )
         }
         return (
-            <mesh scale={scale}>
+            <mesh>
                 <boxGeometry />
                 <meshStandardMaterial color={color} />
             </mesh>
         )
-    }, [modelpath, scale, color])
+    }, [modelpath, color])
 
     if (physics === 'none') {
         return (
-            <group name={name} position={position} rotation={rotation}>
+            <group name={name} position={position} rotation={rotation} scale={scale}>
                 {content}
             </group>
         )
@@ -55,6 +54,7 @@ export default function StaticMesh(props: StaticMeshType) {
             type={physics === 'dynamic' ? 'dynamic' : 'fixed'}
             position={position}
             rotation={rotation}
+            scale={scale}
             colliders={appliedCollider}
         >
             {content}

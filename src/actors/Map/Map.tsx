@@ -61,10 +61,9 @@ export default function Map(props: MapType) {
               key={tile.index.join("-")}
               type="fixed"
               colliders="trimesh"
+              position={tile.position}
             >
-              <group position={tile.position}>
-                {content}
-              </group>
+              {content}
             </RigidBody>
           )
         })}
@@ -93,15 +92,14 @@ export default function Map(props: MapType) {
   }
 
   return (
-    <RigidBody type="fixed" colliders="trimesh">
-      <group
-        name={name}
-        scale={scale}
-        position={position}
-        rotation={rotation}
-      >
-        {content}
-      </group>
+    <RigidBody 
+      type="fixed" 
+      colliders="trimesh"
+      position={position}
+      rotation={rotation}
+      scale={scale}
+    >
+      {content}
     </RigidBody>
   )
 }
