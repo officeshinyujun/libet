@@ -27,7 +27,7 @@ export type MapType = BaseActorType & {
    *
    * @default "none"
    */
-  physics?: "fixed" | "none"
+  physics?: "fixed" | "none" | "dynamic";
 
   /**
    * 맵을 분할할 chunk 한 변의 크기
