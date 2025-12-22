@@ -1,5 +1,6 @@
 import { BaseActorType } from "../BaseActor/type"
 import * as THREE from "three"
+import { ReactNode } from "react"
 
 /**
  * 플레이어 또는 NPC 캐릭터 타입
@@ -19,4 +20,7 @@ export type CharacterType = BaseActorType & {
 
   /** 점프 높이 (world unit 기준) */
   jumpHeight: number
+
+  /** 추가 로직 또는 컴포넌트 */
+  children?: ReactNode
 }
