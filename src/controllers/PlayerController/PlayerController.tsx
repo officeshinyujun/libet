@@ -7,6 +7,7 @@ import { useRapier } from "@react-three/rapier"
 import * as THREE from "three"
 import { applyDirectMovement } from "../../systems/MovementSystem/DirectMovement"
 import { applyInertialMovement } from "../../systems/MovementSystem/InertialMovement"
+import { useRef } from "react"
 
 /**
  * PlayerController
@@ -17,7 +18,15 @@ import { applyInertialMovement } from "../../systems/MovementSystem/InertialMove
  * - Uses Raycasting for Ground Detection (Jump).
  */
 export default function PlayerController(props : PlayerControllerType) {
-    const {controllerID, view, inertia = false} = props
+    const {
+        controllerID, 
+        view, 
+        inertia = false,
+        crouch = false,
+        crouchKey = "ControlLeft",
+        crouchDepth = 0.5
+    } = props
+
     const { getCharacter } = useWorld()
     const { camera } = useThree()
     const { rapier, world } = useRapier()
@@ -28,6 +37,7 @@ export default function PlayerController(props : PlayerControllerType) {
     const [moveLeft, setMoveLeft] = useState(false)
     const [moveRight, setMoveRight] = useState(false)
     const [jump, setJump] = useState(false)
+    const [isCrouching, setIsCrouching] = useState(false)
 
     // Reusable vectors to avoid GC overhead
     const frontVector = useMemo(() => new THREE.Vector3(), [])
@@ -35,12 +45,14 @@ export default function PlayerController(props : PlayerControllerType) {
     const direction = useMemo(() => new THREE.Vector3(), [])
     const worldUp = useMemo(() => new THREE.Vector3(0, 1, 0), [])
     
-    // Raycast setup
-    // Determine if we need to filter interaction groups or just hit everything (solid)
-    // For now, hitting anything solid is fine.
+    // Current camera height offset for smooth transition
+    const currentHeightOffset = useRef(0);
 
     useEffect(() => {
         const onKeyDown = (event: KeyboardEvent) => {
+            if (event.code === crouchKey && crouch) {
+                setIsCrouching(true);
+            }
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW': setMoveForward(true); break;
@@ -54,6 +66,9 @@ export default function PlayerController(props : PlayerControllerType) {
             }
         };
         const onKeyUp = (event: KeyboardEvent) => {
+            if (event.code === crouchKey && crouch) {
+                setIsCrouching(false);
+            }
             switch (event.code) {
                 case 'ArrowUp':
                 case 'KeyW': setMoveForward(false); break;
@@ -72,7 +87,7 @@ export default function PlayerController(props : PlayerControllerType) {
             document.removeEventListener('keydown', onKeyDown);
             document.removeEventListener('keyup', onKeyUp);
         };
-    }, []);
+    }, [crouch, crouchKey]);
 
     useFrame((state, delta) => {
         const characterData = getCharacter(controllerID);
@@ -85,23 +100,30 @@ export default function PlayerController(props : PlayerControllerType) {
         const scale = charProps.scale || [1, 1, 1];
         const height = scale[1]; 
 
+        // --- Crouch Logic ---
+        const standingEyeHeight = height / 2 * 0.9;
+        const crouchingEyeHeight = standingEyeHeight * crouchDepth;
+        const targetEyeHeight = isCrouching ? crouchingEyeHeight : standingEyeHeight;
+
+        // Initialize currentHeightOffset if it's the first frame (0)
+        if (currentHeightOffset.current === 0) currentHeightOffset.current = standingEyeHeight;
+
+        // Smoothly interpolate camera height
+        currentHeightOffset.current = THREE.MathUtils.lerp(currentHeightOffset.current, targetEyeHeight, 10 * delta);
+
         // --- 1. Camera Sync (Eye Level Calculation) ---
         if (view === 'firstPerson') {
-             const eyeOffset = height / 2 * 0.9; 
-             camera.position.set(position.x, position.y + eyeOffset, position.z);
+             camera.position.set(position.x, position.y + currentHeightOffset.current, position.z);
         } else if (view === 'thirdPerson') {
              // Third Person: Orbit around the character
-             // Focus point: Slightly above center (e.g., head area)
-             const focusY = height / 2 * 0.5; // Look at upper body/head
+             // Focus point changes with crouch
+             const focusY = currentHeightOffset.current * 0.8; // Look slightly below eye level
              const focusPoint = new THREE.Vector3(position.x, position.y + focusY, position.z);
              
              // Offset distance based on scale
              const distance = height * 3.0; // Distance behind
              
              // Calculate offset vector relative to camera rotation
-             // We want the camera to be 'distance' away, 'behind' the rotation direction.
-             // Since PointerLockControls rotates the camera to look FORWARD,
-             // we place the camera BACKWARD relative to that rotation.
              const offset = new THREE.Vector3(0, 0, distance);
              offset.applyQuaternion(camera.quaternion);
              
