@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo } from "react"
 import { PointerLockControls } from "@react-three/drei"
 import { useRapier } from "@react-three/rapier"
 import * as THREE from "three"
+import { applyDirectMovement } from "../../systems/MovementSystem/DirectMovement"
+import { applyInertialMovement } from "../../systems/MovementSystem/InertialMovement"
 
 /**
  * PlayerController
@@ -15,7 +17,7 @@ import * as THREE from "three"
  * - Uses Raycasting for Ground Detection (Jump).
  */
 export default function PlayerController(props : PlayerControllerType) {
-    const {controllerID, view} = props
+    const {controllerID, view, inertia = false} = props
     const { getCharacter } = useWorld()
     const { camera } = useThree()
     const { rapier, world } = useRapier()
@@ -87,12 +89,34 @@ export default function PlayerController(props : PlayerControllerType) {
         if (view === 'firstPerson') {
              const eyeOffset = height / 2 * 0.9; 
              camera.position.set(position.x, position.y + eyeOffset, position.z);
+        } else if (view === 'thirdPerson') {
+             // Third Person: Orbit around the character
+             // Focus point: Slightly above center (e.g., head area)
+             const focusY = height / 2 * 0.5; // Look at upper body/head
+             const focusPoint = new THREE.Vector3(position.x, position.y + focusY, position.z);
+             
+             // Offset distance based on scale
+             const distance = height * 3.0; // Distance behind
+             
+             // Calculate offset vector relative to camera rotation
+             // We want the camera to be 'distance' away, 'behind' the rotation direction.
+             // Since PointerLockControls rotates the camera to look FORWARD,
+             // we place the camera BACKWARD relative to that rotation.
+             const offset = new THREE.Vector3(0, 0, distance);
+             offset.applyQuaternion(camera.quaternion);
+             
+             camera.position.copy(focusPoint).add(offset);
         }
 
         // --- 2. Movement Logic (Camera Relative) ---
         camera.getWorldDirection(frontVector);
         frontVector.y = 0;
         frontVector.normalize();
+
+        // Rotate Character to face camera direction
+        const angle = Math.atan2(frontVector.x, frontVector.z);
+        const rotationQuat = new THREE.Quaternion().setFromAxisAngle(worldUp, angle);
+        rigidBody.setRotation(rotationQuat, true);
 
         sideVector.crossVectors(frontVector, worldUp).normalize();
         
@@ -108,11 +132,11 @@ export default function PlayerController(props : PlayerControllerType) {
         const speed = charProps.speed || 5.0;
         const vel = rigidBody.linvel();
         
-        rigidBody.setLinvel({ 
-            x: direction.x * speed, 
-            y: vel.y, 
-            z: direction.z * speed 
-        }, true);
+        if (inertia) {
+            applyInertialMovement(rigidBody, direction, speed, delta);
+        } else {
+            applyDirectMovement(rigidBody, direction, speed);
+        }
 
         // --- 3. Jump Logic (Raycast Ground Check) ---
         if (jump) {
@@ -130,29 +154,6 @@ export default function PlayerController(props : PlayerControllerType) {
              // Cast ray
              // hit will be null if nothing found within maxToi
              const hit = world.castRay(ray, rayLength, true);
-
-             // Check if hit exists and isn't the player itself?
-             // Rapier rays usually don't hit the source collider if it starts inside, 
-             // but 'solid' param (3rd arg) might affect this.
-             // Usually we filter out the player collider, but simplest is relying on 'internal' checks.
-             // If we start at center, we are inside our own collider. 
-             // If 'solid' is true, it might hit ourselves at distance 0.
-             // So we should filter specific collider or ignore self.
-             
-             // A better approach without filtering complexity: start ray slightly below center?
-             // Or check hit distance. If distance < epsilon, it's self.
-             
-             // However, cleaner way: RigidBody excludes itself from queries? Not automatic.
-             
-             // Let's assume for now the ray starts inside and ignores backfaces/internal or we can use a InteractionGroup.
-             // BUT, easiest fix: Use 'world.castRay' with a filter or simple distance check?
-             // Actually, if we hit ourselves, the distance is 0. Ground is at height/2.
-             
-             // Let's refine: Start ray at bottom + epsilon UP? No, prone to tunnelling.
-             
-             // Filter:
-             // castRay(ray, maxToi, solid, filterFlags, filterGroups, filterExcludeCollider, filterExcludeRigidBody)
-             // We can pass 'rigidBody' to exclude it!
              
              const hitFiltered = world.castRay(
                 ray, 
@@ -187,7 +188,7 @@ export default function PlayerController(props : PlayerControllerType) {
 
     return (
         <>
-            {view === 'firstPerson' && <PointerLockControls />}
+            {(view === 'firstPerson' || view === 'thirdPerson') && <PointerLockControls />}
         </>
     )
 }
