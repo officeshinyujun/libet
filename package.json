@@ -1,42 +1,13 @@
 {
-  "name": "@web-game/libet",
-  "version": "0.1.0",
-  "description": "A lightweight React Three Fiber based web game engine.",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
-    }
-  },
-  "files": ["dist"],
+  "name": "libet-monorepo",
+  "private": true,
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch"
+    "build": "pnpm -r build",
+    "dev": "pnpm -r --parallel dev",
+    "dev:playground": "pnpm --filter @web-game/libet build && pnpm --filter playground dev",
+    "clean": "pnpm -r clean"
   },
-  "peerDependencies": {
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "three": ">=0.150.0",
-    "@react-three/fiber": "^9.0.0",
-    "@react-three/drei": "^10.0.0",
-    "@react-three/rapier": "^2.0.0"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "@types/three": "^0.182.0",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "three": "^0.182.0",
-    "@react-three/fiber": "^9.0.0",
-    "@react-three/drei": "^10.0.0",
-    "@react-three/rapier": "^2.0.0",
-    "typescript": "^5.0.0",
-    "tsup": "^8.0.0"
+  "engines": {
+    "node": ">=18"
   }
 }

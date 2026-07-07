@@ -1,24 +1,36 @@
 # Node
 node_modules/
+.pnpm-store/
+
+# Build outputs
 dist/
+.next/
 build/
+*.tsbuildinfo
+
+# Environment
 .env
 .env.local
-.DS_Store
+.env.*.local
+
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.lgtm/
-.eslintcache
-.vscode/
 
-# TypeScript
-*.tsbuildinfo
-
-# IDEs and OS
+# IDE
 .idea/
 .vscode/
+*.swp
+*.swo
+
+# OS
 .DS_Store
 Thumbs.db
+
+# Misc
+.eslintcache
+.lgtm/
+*.tsbuildinfo
